@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowUpRight,
   Bell, ChevronDown, ChevronRight, CircleHelp, Clock3,
@@ -104,17 +104,156 @@ function Overview({ setPage }) {
     </>
   );
 }
-
+ 
 function IOCSearch() {
   const [query, setQuery] = useState("");
-  const [searched, setSearched] = useState("");
-  function submit(e) { e.preventDefault(); setSearched(query.trim()); }
-  return <>
-    <div className="page-heading"><div><div className="eyebrow">INDICATOR INVESTIGATION</div><h1>IOC Search</h1><p>Inspect an indicator and review its available context.</p></div></div>
-    <section className="panel search-panel"><div className="search-hero-icon"><FileSearch size={26} /></div><h2>Investigate an indicator</h2><p>Enter a domain, URL, IP address or file hash to begin.</p><form className="ioc-form" onSubmit={submit}><Search size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. suspicious-domain.example" required /><button className="button button-primary" type="submit">Search IOC</button></form><div className="search-hints"><span>Try a sample:</span>{["secure-mod-gov.in.example", "random-verify-8472.test"].map(v => <button key={v} onClick={() => {setQuery(v); setSearched(v);}}>{v}</button>)}</div></section>
-    {searched && <section className="panel result-panel"><div className="panel-heading"><div><h2>Search result</h2><p className="mono">{searched}</p></div><Badge tone="orange">Demo result</Badge></div><div className="notice"><AlertTriangle size={18} /><div><strong>Live analysis is not connected.</strong><p>This screen currently demonstrates the UI only. It has not queried your saved model or threat datasets.</p></div></div><div className="result-grid"><div><span>Assessment</span><strong>Pending analysis</strong></div><div><span>Campaign match</span><strong>No live lookup</strong></div><div><span>Attribution</span><strong>Not assessed</strong></div></div></section>}
-  </>;
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+
+    const domain = query.trim();
+    if (!domain) return;
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ domain }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Prediction request failed.");
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(
+        err.message === "Failed to fetch"
+          ? "Cannot reach the Python API. Make sure FastAPI is running on port 8000."
+          : err.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const suspicious = result?.predicted_label === "suspicious";
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">INDICATOR INVESTIGATION</div>
+          <h1>IOC Search</h1>
+          <p>Submit a domain to your trained baseline classification model.</p>
+        </div>
+      </div>
+
+      <section className="panel search-panel">
+        <div className="search-hero-icon"><FileSearch size={26} /></div>
+        <h2>Investigate a domain</h2>
+        <p>This endpoint classifies domain strings; it does not verify live threat intelligence.</p>
+
+        <form className="ioc-form" onSubmit={submit}>
+          <Search size={18} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="e.g. suspicious-domain.example"
+            required
+            maxLength={253}
+          />
+          <button className="button button-primary" type="submit" disabled={loading}>
+            {loading ? "Analyzing..." : "Analyze Domain"}
+          </button>
+        </form>
+
+        <div className="search-hints">
+          <span>Try a sample:</span>
+          {["google.com", "myntra-secure-login.com"].map((domain) => (
+            <button
+              type="button"
+              key={domain}
+              onClick={() => setQuery(domain)}
+            >
+              {domain}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {error && (
+        <section className="panel result-panel">
+          <div className="notice">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>Request failed</strong>
+              <p>{error}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {result && (
+        <section className="panel result-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Model prediction</h2>
+              <p className="mono">{result.domain}</p>
+            </div>
+            <Badge tone={suspicious ? "red" : "green"}>
+              {result.predicted_label}
+            </Badge>
+          </div>
+
+          <div className="notice">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>Baseline model output</strong>
+              <p>{result.warning}</p>
+            </div>
+          </div>
+
+          <div className="result-grid">
+            <div>
+              <span>Predicted label</span>
+              <strong>{result.predicted_label}</strong>
+            </div>
+            <div>
+              <span>Benign score</span>
+              <strong>{result.model_scores?.benign !== undefined
+                ? `${(result.model_scores.benign * 100).toFixed(2)}%`
+                : "Unavailable"}</strong>
+            </div>
+            <div>
+              <span>Suspicious score</span>
+              <strong>{result.model_scores?.suspicious !== undefined
+                ? `${(result.model_scores.suspicious * 100).toFixed(2)}%`
+                : "Unavailable"}</strong>
+            </div>
+          </div>
+
+          <p className="chart-footnote">
+            Scores are model outputs, not calibrated probabilities or proof of malicious activity.
+            Campaign matching and APT attribution have not been performed.
+          </p>
+        </section>
+      )}
+    </>
+  );
 }
+
 
 function CampaignExplorer() {
   const [filter, setFilter] = useState("");
@@ -144,11 +283,41 @@ function RelationshipGraph() {
 }
 
 export default function App() {
+  const [backendConnected, setBackendConnected] = useState(false);
   const [page, setPage] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  useEffect(() => {
+  let active = true;
+
+  async function checkBackend() {
+    try {
+      const response = await fetch("http://localhost:5000/api/health");
+      const data = await response.json();
+
+      if (active) {
+        setBackendConnected(
+          response.ok &&
+          data.backend === "healthy" &&
+          data.ml_api?.status === "healthy" &&
+          data.ml_api?.model_loaded === true
+        );
+      }
+    } catch {
+      if (active) setBackendConnected(false);
+    }
+  }
+
+  checkBackend();
+  const interval = setInterval(checkBackend, 10000);
+
+  return () => {
+    active = false;
+    clearInterval(interval);
+  };
+}, []);
 
   const pageComponents = {
     Dashboard: <Overview setPage={setPage} />,
@@ -163,15 +332,25 @@ export default function App() {
     <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <div className="brand"><div className="brand-mark"><ShieldCheck size={23} /></div><div><strong>APT<span>INTEL</span></strong><small>THREAT INTELLIGENCE</small></div><button className="mobile-close icon-button" onClick={() => setSidebarOpen(false)}><X size={18} /></button></div>
       <div className="workspace-label">WORKSPACE <ChevronDown size={13} /></div>
-      <div className="workspace-card"><div className="workspace-avatar">DR</div><div><strong>DRDO Research</strong><span>Threat Analysis Unit</span></div><ChevronDown size={15} /></div>
+      <div className="workspace-card"><div className="workspace-avatar">DR</div><div><strong>APT Research</strong><span>Threat Analysis Unit</span></div><ChevronDown size={15} /></div>
       <nav className="sidebar-nav">{["MAIN","INTELLIGENCE"].map(group => <div className="nav-group" key={group}><div className="nav-group-label">{group}</div>{navItems.filter(n => n.group === group).map(item => <button key={item.label} onClick={() => {setPage(item.label);setSidebarOpen(false);}} className={`nav-item ${page === item.label ? "nav-active" : ""}`}><item.icon size={18} strokeWidth={1.8} /><span>{item.label}</span>{item.label === "New Threat Analysis" && <span className="nav-indicator" />}</button>)}</div>)}</nav>
-      <div className="sidebar-bottom"><div className="system-status"><span className="status-dot" /><div><strong>Interface ready</strong><small>Backend not connected</small></div></div><button className="nav-item" onClick={() => alert("Settings will be added in a later stage.")}><Settings size={18} /><span>Settings</span></button><div className="user-profile"><div className="user-avatar">AI</div><div><strong>Analyst Workspace</strong><span>Local development</span></div><ChevronDown size={15} /></div></div>
+      <div className="sidebar-bottom"><div className="system-status">
+  <span
+    className={`status-dot ${backendConnected ? "status-online" : "status-offline"}`}
+  />
+  <div>
+    <strong>Interface ready</strong>
+    <small>
+      {backendConnected ? "Backend connected" : "Backend unavailable"}
+    </small>
+  </div>
+</div><button className="nav-item" onClick={() => alert("Settings will be added in a later stage.")}><Settings size={18} /><span>Settings</span></button><div className="user-profile"><div className="user-avatar">AI</div><div><strong>Analyst Workspace</strong><span>Local development</span></div><ChevronDown size={15} /></div></div>
     </aside>
 
     <main className="main-area">
       <header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><div className="breadcrumb">Workspace <ChevronRight size={14} /><strong>{page}</strong></div></div><div className="topbar-actions"><div className={`global-search ${searchOpen ? "global-search-open" : ""}`}><Search size={16} /><input value={globalSearch} onFocus={() => setSearchOpen(true)} onChange={e => setGlobalSearch(e.target.value)} onKeyDown={e => {if(e.key === "Enter" && globalSearch.trim()){setPage("IOC Search");setSearchOpen(false);}}} placeholder="Search anything..." /><kbd>↵</kbd></div><div className="topbar-divider" /><button className="icon-button notification-button" onClick={() => setNotificationsOpen(v => !v)} aria-label="Notifications"><Bell size={18} /><span /></button>{notificationsOpen && <div className="notification-popover"><strong>Notifications</strong><p>No live notifications. Backend integration is pending.</p></div>}<div className="topbar-avatar">DR</div></div></header>
       <div className="content-area">{pageComponents[page]}</div>
-      <footer className="app-footer"><span><ShieldCheck size={14} /> DRDO APT Intelligence System</span><span>Frontend prototype <i /> Data is illustrative until connected</span></footer>
+      <footer className="app-footer"><span><ShieldCheck size={14} /> APT Intelligence System</span><span>Frontend prototype <i /> Data is illustrative until connected</span></footer>
     </main>
   </div>;
 }

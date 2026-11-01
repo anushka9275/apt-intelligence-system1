@@ -201,5 +201,73 @@ def main():
 
     print(f"\nFull result saved to: {OUTPUT_FILE}")
 
+def match_ioc(new_ioc):
+    if not PROFILE_FILE.exists():
+        raise FileNotFoundError(
+            f"Campaign profiles not found: {PROFILE_FILE}"
+        )
+
+    if not new_ioc.get("IOC"):
+        raise ValueError("Set IOC to the domain or URL being investigated.")
+
+    with open(PROFILE_FILE, encoding="utf-8") as file:
+        profiles = json.load(file)
+
+    results = []
+
+    for profile in profiles:
+        best_member = None
+
+        for member in profile["members"]:
+            comparison = compare_member(new_ioc, member)
+
+            if (
+                best_member is None
+                or comparison["score"] > best_member["score"]
+            ):
+                best_member = {
+                    **comparison,
+                    "matched_member": member["IOC"],
+                }
+
+        if best_member is not None:
+            results.append({
+                "campaign_profile_id": profile["campaign_profile_id"],
+                **best_member,
+            })
+
+    results.sort(
+        key=lambda item: item["score"],
+        reverse=True
+    )
+
+    if not results:
+        raise ValueError(
+            "No campaign profiles were available for comparison."
+        )
+
+    best = results[0]
+
+    if (
+        best["score"] >= 0.50
+        and best["strong_evidence_count"] >= 2
+    ):
+        status = "Candidate campaign match"
+    else:
+        status = "No established campaign match"
+
+    return {
+        "IOC": new_ioc["IOC"],
+        "status": status,
+        "threshold": 0.50,
+        "note": (
+            "Similarity scores are heuristic, not probabilities. "
+            "A candidate match requires review; no match does not mean benign."
+        ),
+        "top_match": best,
+        "ranked_candidates": results,
+    }
+
+
 if __name__ == "__main__":
     main()

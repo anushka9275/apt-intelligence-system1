@@ -122,7 +122,7 @@ function IOCSearch() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/predict", {
+      const response = await fetch("http://127.0.0.1:8000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -289,20 +289,22 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  useEffect(() => {
+ useEffect(() => {
   let active = true;
 
   async function checkBackend() {
     try {
-      const response = await fetch("http://localhost:5000/api/health");
+      const response = await fetch(
+        "http://127.0.0.1:8000/health"
+      );
+
       const data = await response.json();
 
       if (active) {
         setBackendConnected(
           response.ok &&
-          data.backend === "healthy" &&
-          data.ml_api?.status === "healthy" &&
-          data.ml_api?.model_loaded === true
+          data.status === "healthy" &&
+          data.model_loaded === true
         );
       }
     } catch {
@@ -311,6 +313,7 @@ export default function App() {
   }
 
   checkBackend();
+
   const interval = setInterval(checkBackend, 10000);
 
   return () => {

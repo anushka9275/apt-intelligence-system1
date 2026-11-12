@@ -266,12 +266,302 @@ function CampaignExplorer() {
 }
 
 function NewThreatAnalysis() {
-  return <>
-    <div className="page-heading"><div><div className="eyebrow">EMERGING THREATS</div><h1>New Threat Analysis</h1><p>Review indicators that do not have an established campaign match.</p></div><Badge tone="orange">Analyst review</Badge></div>
-    <section className="notice notice-wide"><ShieldAlert size={22} /><div><strong>Unknown does not automatically mean malicious.</strong><p>Campaign matching and maliciousness classification are separate decisions. Review evidence before assigning an actor.</p></div></section>
-    <section className="panel"><div className="panel-heading"><div><h2>Unmatched indicator examples</h2><p>Illustrative records for workflow testing</p></div><Badge>Demo data</Badge></div><div className="table-wrap"><table><thead><tr><th>INDICATOR</th><th>CAMPAIGN STATUS</th><th>ATTRIBUTION STATUS</th><th>NEXT ACTION</th></tr></thead><tbody><tr><td className="mono">random-verify-8472.test</td><td><Badge tone="orange">No established match</Badge></td><td><Badge>Insufficient evidence</Badge></td><td>Enrich and review</td></tr><tr><td className="mono">unclustered-sample.example</td><td><Badge tone="gray">Unclustered</Badge></td><td><Badge>Not assessed</Badge></td><td>Compare behaviour</td></tr></tbody></table></div></section>
-    <section className="panel workflow-panel"><h2>Suggested investigation workflow</h2><div className="workflow-steps">{[{n:"01",title:"Enrich",desc:"Collect DNS, IP, ASN, certificate and URL context."},{n:"02",title:"Compare",desc:"Compare behaviour and infrastructure with known campaigns."},{n:"03",title:"Review",desc:"Record supporting and conflicting evidence."},{n:"04",title:"Attribute",desc:"Suggest an actor only when evidence supports it."}].map(s => <div className="workflow-step" key={s.n}><span>{s.n}</span><h3>{s.title}</h3><p>{s.desc}</p></div>)}</div></section>
-  </>;
+  const [ioc, setIoc] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function analyzeThreat(e) {
+    e.preventDefault();
+
+    const value = ioc.trim();
+
+    if (!value) return;
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/campaign-match",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            IOC: value,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Campaign matching request failed."
+        );
+      }
+
+      setResult(data);
+
+    } catch (err) {
+      setError(
+        err.message === "Failed to fetch"
+          ? "Cannot reach the Python API. Make sure FastAPI is running on port 8000."
+          : err.message
+      );
+
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const topMatch = result?.top_match;
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">EMERGING THREATS</div>
+          <h1>New Threat Analysis</h1>
+          <p>
+            Compare a new indicator against established campaign profiles.
+          </p>
+        </div>
+
+        <Badge tone="orange">Analyst review</Badge>
+      </div>
+
+      <section className="notice notice-wide">
+        <ShieldAlert size={22} />
+        <div>
+          <strong>Campaign matching is evidence-based.</strong>
+          <p>
+            A match does not prove attribution. Review the supporting
+            infrastructure and behavioural evidence.
+          </p>
+        </div>
+      </section>
+
+      <section className="panel search-panel">
+        <div className="search-hero-icon">
+          <Target size={26} />
+        </div>
+
+        <h2>Analyze a new IOC</h2>
+
+        <p>
+          Submit an IOC to compare it against the discovered campaign profiles.
+        </p>
+
+        <form className="ioc-form" onSubmit={analyzeThreat}>
+          <Search size={18} />
+
+          <input
+            value={ioc}
+            onChange={(e) => setIoc(e.target.value)}
+            placeholder="e.g. secure-mod-gov.in.example"
+            required
+          />
+
+          <button
+            className="button button-primary"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Matching..." : "Analyze Threat"}
+          </button>
+        </form>
+
+        <div className="search-hints">
+          <span>Try a sample:</span>
+
+          {[
+            "secure-mod-gov.in.example",
+            "random-verify-8472.test",
+          ].map((sample) => (
+            <button
+              type="button"
+              key={sample}
+              onClick={() => setIoc(sample)}
+            >
+              {sample}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {error && (
+        <section className="panel result-panel">
+          <div className="notice">
+            <AlertTriangle size={18} />
+
+            <div>
+              <strong>Request failed</strong>
+              <p>{error}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {result && (
+        <section className="panel result-panel">
+
+          <div className="panel-heading">
+            <div>
+              <h2>Campaign matching result</h2>
+              <p className="mono">{result.IOC}</p>
+            </div>
+
+            <Badge
+              tone={
+                result.status === "Candidate campaign match"
+                  ? "green"
+                  : "orange"
+              }
+            >
+              {result.status}
+            </Badge>
+          </div>
+
+          <div className="result-grid">
+            <div>
+              <span>Top campaign</span>
+              <strong>
+                {topMatch?.campaign_profile_id || "Unavailable"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Similarity score</span>
+              <strong>
+                {topMatch?.score !== undefined
+                  ? `${(topMatch.score * 100).toFixed(2)}%`
+                  : "Unavailable"}
+              </strong>
+            </div>
+
+            <div>
+              <span>Strong evidence signals</span>
+              <strong>
+                {topMatch?.strong_evidence_count ?? "0"}
+              </strong>
+            </div>
+          </div>
+
+          <section className="notice">
+            <ShieldCheck size={18} />
+
+            <div>
+              <strong>Matched profile IOC</strong>
+              <p className="mono">
+                {topMatch?.matched_member || "No profile IOC available"}
+              </p>
+            </div>
+          </section>
+
+          <div className="panel-heading">
+            <div>
+              <h3>Matching evidence</h3>
+
+              <div className="search-hints">
+                {topMatch?.evidence?.length ? (
+                  topMatch.evidence.map((item) => (
+                    <Badge key={item} tone="blue">
+                      {item}
+                    </Badge>
+                  ))
+                ) : (
+                  <span>No strong matching evidence found.</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <p className="chart-footnote">
+            {result.note}
+          </p>
+
+          {result.ranked_candidates?.length > 0 && (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>CAMPAIGN</th>
+                    <th>SCORE</th>
+                    <th>MATCHED IOC</th>
+                    <th>EVIDENCE</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {result.ranked_candidates.slice(0, 3).map((candidate) => (
+                    <tr key={candidate.campaign_profile_id}>
+                      <td>
+                        {candidate.campaign_profile_id}
+                      </td>
+
+                      <td>
+                        {(candidate.score * 100).toFixed(2)}%
+                      </td>
+
+                      <td className="mono">
+                        {candidate.matched_member}
+                      </td>
+
+                      <td>
+                        {candidate.evidence?.length
+                          ? candidate.evidence.join(", ")
+                          : "None"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+        </section>
+      )}
+
+      <section className="panel workflow-panel">
+        <h2>Suggested investigation workflow</h2>
+
+        <div className="workflow-steps">
+          {[
+            {
+              n: "01",
+              title: "Enrich",
+              desc: "Collect DNS, IP, ASN, certificate and URL context.",
+            },
+            {
+              n: "02",
+              title: "Compare",
+              desc: "Compare infrastructure with known campaign profiles.",
+            },
+            {
+              n: "03",
+              title: "Review",
+              desc: "Record supporting and conflicting evidence.",
+            },
+            {
+              n: "04",
+              title: "Attribute",
+              desc: "Suggest an actor only when evidence supports it.",
+            },
+          ].map((step) => (
+            <div className="workflow-step" key={step.n}>
+              <span>{step.n}</span>
+              <h3>{step.title}</h3>
+              <p>{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
 }
 
 function RelationshipGraph() {

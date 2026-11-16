@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import json
 
 import joblib
 from fastapi import FastAPI, HTTPException
@@ -23,6 +24,12 @@ CAMPAIGNS_DIR = (
     PROJECT_ROOT
     / "ml"
     / "campaigns"
+)
+CAMPAIGN_PROFILES_PATH = (
+    PROJECT_ROOT
+    / "datasets"
+    / "processed"
+    / "campaign_profiles.json"
 )
 
 
@@ -129,6 +136,48 @@ def health():
         "status": "healthy",
         "model_loaded": True,
     }
+# ============================================================
+# CAMPAIGN PROFILES
+# ============================================================
+
+@app.get("/campaigns")
+def get_campaigns():
+
+    if not CAMPAIGN_PROFILES_PATH.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Campaign profiles file not found",
+        )
+
+    try:
+        with open(
+            CAMPAIGN_PROFILES_PATH,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            profiles = json.load(file)
+
+        if not isinstance(profiles, list):
+            raise ValueError(
+                "Campaign profiles must contain a JSON list"
+            )
+
+        return {
+            "total_profiles": len(profiles),
+            "profiles": profiles,
+        }
+
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Campaign profiles JSON is invalid",
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        )
 
 
 # ============================================================

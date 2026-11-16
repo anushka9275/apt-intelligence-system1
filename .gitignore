@@ -20,8 +20,11 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Keep raw and processed datasets local until approved
-datasets/
+# Keep datasets local except the campaign profiles required by the API
+datasets/*
+!datasets/processed/
+datasets/processed/*
+!datasets/processed/campaign_profiles.json
 
 # Keep evaluation exports local until reviewed
 reports/*.csv

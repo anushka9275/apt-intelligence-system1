@@ -36,15 +36,8 @@ def clean(value, default=""):
     return str(value).strip()
 
 
-def main():
+def attribute_campaign(match_result):
     # 1. Load the existing campaign match result.
-    if not MATCH_RESULT_PATH.exists():
-        raise FileNotFoundError(
-            f"Campaign match result not found: {MATCH_RESULT_PATH}"
-        )
-
-    with open(MATCH_RESULT_PATH, "r", encoding="utf-8") as file:
-        match_result = json.load(file)
 
     ioc = match_result.get("IOC", "Unknown IOC")
     match_status = match_result.get("status", "")
@@ -77,8 +70,7 @@ def main():
             "The top-ranked candidate, if present, is an unconfirmed lead.",
             "No APT actor has been attributed to this IOC.",
         ]
-        save_result(result)
-        return
+        return result
 
     # 3. Load the original labelled campaign dataset.
     if not DATASET_PATH.exists():
@@ -117,8 +109,8 @@ def main():
         result["attribution_rationale"] = [
             "The candidate match has no matched-member IOC to cross-reference."
         ]
-        save_result(result)
-        return
+        return result
+     
 
     # 4. Find the corresponding labelled IOC in the source dataset.
     data["_IOC_NORMALIZED"] = (
@@ -137,8 +129,8 @@ def main():
             "The matched member was not found in the labelled source dataset.",
             "No actor attribution was made.",
         ]
-        save_result(result)
-        return
+        return result
+     
 
     # Use the reference member's campaign label.
     reference = member_rows.iloc[0]
@@ -157,8 +149,8 @@ def main():
             "The matched reference is labelled UNCLUSTERED.",
             "No named actor was assigned.",
         ]
-        save_result(result)
-        return
+        return result
+       
 
     campaign_rows = data[
         data["Campaign_ID"].fillna("").astype(str).str.strip()
@@ -182,8 +174,8 @@ def main():
             "The source dataset does not provide one consistent actor label.",
             "Manual analyst review is required.",
         ]
-        save_result(result)
-        return
+        return result
+    
 
     actor = next(iter(unique_actors))
 
@@ -199,8 +191,8 @@ def main():
             f"The reference campaign is labelled '{actor}'.",
             "Campaign membership does not establish APT identity.",
         ]
-        save_result(result)
-        return
+        return result
+    
 
     # 5. Preserve the most conservative confidence label in this campaign.
     confidence_rank = {
@@ -240,8 +232,19 @@ def main():
         "Candidate Attribution — Analyst Review Required"
     )
 
-    save_result(result)
+    return result
 
+def main():
+    if not MATCH_RESULT_PATH.exists():
+        raise FileNotFoundError(
+            f"Campaign match result not found: {MATCH_RESULT_PATH}"
+        )
+
+    with open(MATCH_RESULT_PATH, "r", encoding="utf-8") as file:
+        match_result = json.load(file)
+
+    result = attribute_campaign(match_result)
+    save_result(result)
 
 def save_result(result):
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowUpRight, Bell, ChevronDown,
-  ChevronRight, CircleHelp, Database, Download, Filter,
+  ChevronRight, CircleHelp, Database, Download, Filter, History,
   LayoutDashboard, Menu, Network, Search, Settings,
   ShieldAlert, ShieldCheck, Target, X
 } from "lucide-react";
@@ -10,6 +10,7 @@ import "./App.css";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, group: "MAIN" },
   { label: "IOC Search", icon: Search, group: "MAIN" },
+  { label: "IOC History", icon: History, group: "MAIN" },
   { label: "Campaign Explorer", icon: Target, group: "INTELLIGENCE" },
   { label: "New Threat Analysis", icon: ShieldAlert, group: "INTELLIGENCE" },
   { label: "Relationship Graph", icon: Network, group: "INTELLIGENCE" },
@@ -50,13 +51,96 @@ function StatCard({ label, value, note, icon: Icon, tone = "blue" }) {
 }
 
 function Overview({ setPage }) {
-  const distribution = [
-    ["SideCopy", 5, "purple"],
-    ["Transparent Tribe", 5, "blue"],
-    ["Patchwork", 4, "green"],
-    ["DoNot Team", 4, "orange"],
-    ["Other groups", 10, "gray"],
-  ];
+  const [campaignStats, setCampaignStats] = useState({
+  total_iocs: 0,
+  clustered_iocs: 0,
+  unclustered_iocs: 0,
+});
+
+const [statsLoading, setStatsLoading] = useState(true);
+const [statsError, setStatsError] = useState("");
+
+useEffect(() => {
+  async function fetchCampaignStats() {
+    try {
+      const response = await fetch(
+        "http://localhost:8000/campaign-stats"
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to load campaign statistics.");
+      }
+
+      const data = await response.json();
+      setCampaignStats(data);
+    } catch (error) {
+      setStatsError(error.message);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  fetchCampaignStats();
+}, []);
+    const [campaignData, setCampaignData] = useState({
+    total_profiles: 0,
+    profiles: [],
+  });
+
+  const [campaignLoading, setCampaignLoading] = useState(true);
+  const [campaignError, setCampaignError] = useState("");
+  const [recentIOCs, setRecentIOCs] = useState([]);
+const [historyLoading, setHistoryLoading] = useState(true);
+const [historyError, setHistoryError] = useState("");
+
+useEffect(() => {
+  async function fetchRecentIOCs() {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/ioc-history"
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to load IOC history.");
+      }
+
+      const data = await response.json();
+      setRecentIOCs(data.records || []);
+    } catch (error) {
+      setHistoryError(error.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  fetchRecentIOCs();
+}, []);
+
+  useEffect(() => {
+    async function fetchCampaigns() {
+      try {
+        const response = await fetch("http://localhost:8000/campaigns");
+
+        if (!response.ok) {
+          throw new Error("Unable to load campaign data.");
+        }
+
+        const data = await response.json();
+        setCampaignData(data);
+      } catch (error) {
+        setCampaignError(error.message);
+      } finally {
+        setCampaignLoading(false);
+      }
+    }
+
+    fetchCampaigns();
+  }, []);
+  const distribution = campaignData.profiles.map((profile, index) => ({
+  name: profile.campaign_profile_id,
+  count: profile.member_count,
+  tone: ["purple", "blue", "green", "orange", "gray"][index % 5],
+}));
 
   return (
     <>
@@ -70,10 +154,51 @@ function Overview({ setPage }) {
       </div>
 
        <div className="stats-grid">
-        <StatCard label="Campaign labels" value="8" note="Curated profiles" icon={Target} tone="purple" />
-        <StatCard label="Clustered IOCs" value="34" note="Across discovered groups" icon={Database} tone="blue" />
-        <StatCard label="Unclustered IOCs" value="34" note="Require further review" icon={Activity} tone="orange" />
-        <StatCard label="Attribution" value="Candidate only" note="Analyst validation required" icon={ShieldCheck} tone="green" />
+        <StatCard
+  label="Discovered profiles"
+  value={campaignLoading ? "..." : campaignData.total_profiles}
+  note="Live campaign profiles"
+  icon={Target}
+  tone="purple"
+/>
+
+<StatCard
+  label="Clustered IOCs"
+  value={
+  statsLoading
+    ? "..."
+    : statsError
+      ? "—"
+      : campaignStats.clustered_iocs
+}
+  note="Across discovered groups"
+  icon={Database}
+  tone="blue"
+/>
+
+<StatCard
+  label="Unclustered IOCs"
+  value={
+    statsLoading
+      ? "..."
+      : statsError
+        ? "—"
+        : campaignStats.unclustered_iocs
+  }
+  note={
+    statsError || "No match above campaign threshold"
+  }
+  icon={Activity}
+  tone="orange"
+/>
+
+<StatCard
+  label="Attribution"
+  value="Candidate only"
+  note="Analyst validation required"
+  icon={ShieldCheck}
+  tone="green"
+/>
       </div>
 
        <div className="dashboard-grid">
@@ -84,7 +209,7 @@ function Overview({ setPage }) {
           </div>
           <div className="distribution-total"><strong>8</strong><span>campaign labels</span></div>
           <div className="distribution-list">
-            {distribution.map(([name, count, tone]) => (
+            {distribution.map(({ name, count, tone }) => (
               <div className="distribution-row" key={name}>
                 <div className="distribution-name">
                   <span className={`legend-dot ${tone}-dot`} />{name}<span>{count}</span>
@@ -95,7 +220,7 @@ function Overview({ setPage }) {
               </div>
             ))}
              </div>
-          <p className="chart-footnote">Counts are illustrative and should be checked against the current dataset.</p>
+          <p className="chart-footnote">Live counts from discovered campaign profiles.</p>
         </section>
 
         <section className="panel">
@@ -112,23 +237,47 @@ function Overview({ setPage }) {
 
       <section className="panel recent-panel">
         <div className="panel-heading">
-          <div><h2>Investigation queue</h2><p>Example records for interface testing</p></div>
+          <div><h2>Investigation queue</h2><p>Latest IOC analyses from MongoDB</p></div>
           <button className="text-link" onClick={() => setPage("IOC Search")}>Open IOC Search <ChevronRight size={14} /></button>
         </div>
         <div className="table-wrap">
           <table>
             <thead><tr><th>INDICATOR</th><th>TYPE</th><th>ASSESSMENT</th><th>CAMPAIGN</th><th>CONFIDENCE</th></tr></thead>
-            <tbody>
-              {sampleIOCs.map((ioc) => (
-                <tr key={ioc.value}>
-                  <td className="mono">{ioc.value}</td>
-                  <td>{ioc.type}</td>
-                  <td><Badge tone={ioc.verdict === "Suspicious" ? "red" : "orange"}>{ioc.verdict}</Badge></td>
-                  <td>{ioc.campaign}</td>
-                  <td><Badge tone={ioc.confidence === "High" ? "green" : "gray"}>{ioc.confidence}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
+              <tbody>
+  {historyLoading ? (
+    <tr>
+      <td colSpan="5">Loading IOC history...</td>
+    </tr>
+  ) : historyError ? (
+    <tr>
+      <td colSpan="5">{historyError}</td>
+    </tr>
+  ) : recentIOCs.length === 0 ? (
+    <tr>
+      <td colSpan="5">No IOC records found.</td>
+    </tr>
+  ) : (
+    recentIOCs.slice(0, 5).map((ioc) => (
+      <tr key={ioc._id}>
+        <td className="mono">{ioc.domain}</td>
+        <td>Domain</td>
+        <td>
+          <Badge
+            tone={
+              ioc.predicted_label?.toLowerCase() === "suspicious"
+                ? "red"
+                : "gray"
+            }
+          >
+            {ioc.predicted_label}
+          </Badge>
+        </td>
+        <td>Not checked</td>
+        <td>Not supplied</td>
+      </tr>
+    ))
+  )}
+</tbody>
           </table>
         </div>
       </section>
@@ -151,7 +300,7 @@ function IOCSearch() {
     setResult(null);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/predict", {
+       const response = await fetch("http://localhost:5000/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain: query.trim() }),
@@ -219,12 +368,227 @@ function IOCSearch() {
 }
 
 
+function IOCHistory() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  async function fetchHistory() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/ioc-history");
+
+      if (!response.ok) {
+        throw new Error("Unable to load IOC history.");
+      }
+
+      const data = await response.json();
+      setRecords(data.records || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+  const filteredRecords = records.filter((record) => {
+  const matchesSearch = record.domain
+    ?.toLowerCase()
+    .includes(searchTerm.toLowerCase());
+
+  const matchesFilter =
+    filter === "All" ||
+    record.predicted_label?.toLowerCase() === filter.toLowerCase();
+
+  return matchesSearch && matchesFilter;
+});
+
+function exportCSV() {
+  const headers = [
+    "Domain",
+    "Prediction",
+    "Analyzed Date",
+    "Warning"
+  ];
+
+  const escapeCSV = (value) =>
+    `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+  const rows = filteredRecords.map((record) => [
+    record.domain,
+    record.predicted_label,
+    record.createdAt
+      ? new Date(record.createdAt).toLocaleString()
+      : "",
+    record.warning
+  ]);
+
+  const csvContent = [
+    headers.map(escapeCSV).join(","),
+    ...rows.map((row) => row.map(escapeCSV).join(","))
+  ].join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "ioc-history.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">INDICATOR INVESTIGATION</div>
+          <h1>IOC History</h1>
+          <p>View previously analyzed indicators stored in the database.</p>
+        </div>
+
+        <button
+          className="button button-secondary"
+          onClick={fetchHistory}
+          disabled={loading}
+        >
+          {loading ? "Loading..." : "Refresh History"}
+        </button>
+      </div>
+
+      <section className="panel">
+        <div className="history-controls">
+  <input
+    type="text"
+    placeholder="Search domain..."
+    value={searchTerm}
+    onChange={(event) => setSearchTerm(event.target.value)}
+  />
+
+  <select
+    value={filter}
+    onChange={(event) => setFilter(event.target.value)}
+  >
+    <option value="All">All predictions</option>
+    <option value="Suspicious">Suspicious</option>
+    <option value="Benign">Benign</option>
+  </select>
+</div>
+        <div className="panel-heading">
+          <div>
+            <h2>Saved IOC Records</h2>
+            <p>{filteredRecords.length} matching indicators</p>
+          </div>
+          <div className="history-actions">
+  <button
+    className="button button-secondary"
+    onClick={exportCSV}
+    disabled={filteredRecords.length === 0}
+  >
+    <Download size={16} />
+    Export CSV
+  </button>
+
+  <Badge tone="blue">MongoDB Atlas</Badge>
+</div>
+        </div>
+
+        {loading && <p>Loading IOC history...</p>}
+
+        {error && <p className="error-message">{error}</p>}
+
+        {!loading && !error && filteredRecords.length === 0 && (
+          <p>No IOC records found. Analyze a domain to get started.</p>
+        )}
+
+        {!loading && !error && filteredRecords.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>DOMAIN</th>
+                  <th>PREDICTION</th>
+                  <th>DATE ANALYZED</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredRecords.map((record) => (
+                  <tr key={record._id}>
+                    <td>{record.domain}</td>
+                    <td>
+                      <Badge
+                        tone={
+                          record.predicted_label?.toLowerCase() === "suspicious"
+                            ? "red"
+                            : "green"
+                        }
+                      >
+                        {record.predicted_label}
+                      </Badge>
+                    </td>
+                    <td>
+                      {record.createdAt
+                        ? new Date(record.createdAt).toLocaleString()
+                        : "Unknown"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function CampaignExplorer() {
   const [filter, setFilter] = useState("");
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [campaignStats, setCampaignStats] = useState(null);
+const [statsLoading, setStatsLoading] = useState(true);
+const [statsError, setStatsError] = useState("");
+const [expandedProfiles, setExpandedProfiles] = useState({});
 
+    // Fetch campaign statistics
+  useEffect(() => {
+    async function fetchCampaignStats() {
+      try {
+        const response = await fetch(
+          "http://127.0.0.1:8000/campaign-stats"
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load campaign statistics.");
+        }
+
+        const data = await response.json();
+        setCampaignStats(data);
+      } catch (err) {
+        setStatsError(err.message);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    fetchCampaignStats();
+  }, []);
+
+  // Fetch campaign profiles
   useEffect(() => {
     const fetchCampaigns = async () => {
       try {
@@ -240,7 +604,6 @@ function CampaignExplorer() {
         }
 
         const data = await response.json();
-
         setProfiles(data.profiles || []);
       } catch (err) {
         setError(err.message || "Unable to connect to the API.");
@@ -292,12 +655,18 @@ function CampaignExplorer() {
         />
 
         <StatCard
-          label="Unclustered records"
-          value="34"
-          note="Unknown cluster"
-          icon={Network}
-          tone="orange"
-        />
+  label="Unclustered records"
+  value={
+    statsLoading
+      ? "..."
+      : statsError
+        ? "—"
+        : campaignStats?.unclustered_iocs ?? "—"
+  }
+  note={statsError || "No match above campaign threshold"}
+  icon={Network}
+  tone="orange"
+/>
 
         <StatCard
           label="Attribution"
@@ -361,11 +730,85 @@ function CampaignExplorer() {
                   </Badge>
                 </div>
 
-                <span className="campaign-id">
-                  {campaign.campaign_profile_id}
-                </span>
+                
+<span className="campaign-id">
+  {campaign.campaign_profile_id}
+</span>
 
-                <h3>Discovered Campaign Profile</h3>
+<h3>Discovered Campaign Profile</h3>
+
+<div className="campaign-detail-grid">
+  <div className="campaign-detail-item">
+    <span>Cluster status</span>
+    <strong>{campaign.status || "Unavailable"}</strong>
+  </div>
+
+  <div className="campaign-detail-item">
+    <span>Similarity threshold</span>
+    <strong>
+      {typeof campaign.similarity_threshold === "number"
+        ? campaign.similarity_threshold.toFixed(2)
+        : "Unavailable"}
+    </strong>
+  </div>
+
+  <div className="campaign-detail-item">
+    <span>Cluster size</span>
+    <strong>{campaign.cluster_size ?? campaign.member_count}</strong>
+  </div>
+</div>
+<div className="campaign-intelligence">
+  <h4>Campaign Intelligence</h4>
+
+  <div className="campaign-intelligence-item">
+    <span>Target sectors</span>
+    <strong>
+      {campaign.target_sectors?.length
+        ? campaign.target_sectors.join(", ")
+        : "Unavailable"}
+    </strong>
+  </div>
+
+  <div className="campaign-intelligence-item">
+    <span>Target regions</span>
+    <strong>
+      {campaign.target_regions?.length
+        ? campaign.target_regions.join(", ")
+        : "Unavailable"}
+    </strong>
+  </div>
+
+  <div className="campaign-intelligence-item">
+    <span>Lure themes</span>
+    <div className="campaign-theme-list">
+      {campaign.lure_themes?.length
+        ? campaign.lure_themes.map((theme, index) => (
+            <span key={`${theme}-${index}`}>{theme}</span>
+          ))
+        : <span>Unavailable</span>}
+    </div>
+  </div>
+
+  <div className="campaign-intelligence-item">
+    <span>Shared infrastructure</span>
+    <div className="campaign-infrastructure-list">
+      {campaign.shared_infrastructure &&
+      Object.keys(campaign.shared_infrastructure).length > 0 ? (
+        Object.entries(campaign.shared_infrastructure).map(
+          ([field, value]) => (
+            <p key={field}>
+              <strong>{field.replaceAll("_", " ")}</strong>
+              {value}
+            </p>
+          )
+        )
+      ) : (
+        <p>No shared infrastructure identified</p>
+      )}
+    </div>
+  </div>
+</div>
+
 
                 <div className="campaign-card-bottom">
                   <span>
@@ -377,20 +820,36 @@ function CampaignExplorer() {
                 </div>
 
                 <div className="campaign-members">
-                  {(campaign.members || [])
-                    .slice(0, 3)
-                    .map((member, index) => (
-                      <p key={`${member.IOC}-${index}`}>
-                        {member.IOC}
-                      </p>
-                    ))}
+  {(campaign.members || [])
+    .slice(
+      0,
+      expandedProfiles[campaign.campaign_profile_id]
+        ? undefined
+        : 3
+    )
+    .map((member, index) => (
+      <p key={`${member.IOC}-${index}`}>
+        {member.IOC}
+      </p>
+    ))}
 
-                  {campaign.member_count > 3 && (
-                    <p>
-                      +{campaign.member_count - 3} more IOCs
-                    </p>
-                  )}
-                </div>
+  {campaign.members?.length > 3 && (
+    <button
+      className="campaign-members-toggle"
+      onClick={() =>
+        setExpandedProfiles((previous) => ({
+          ...previous,
+          [campaign.campaign_profile_id]:
+            !previous[campaign.campaign_profile_id],
+        }))
+      }
+    >
+      {expandedProfiles[campaign.campaign_profile_id]
+        ? "Show less"
+        : `View all ${campaign.members.length} IOCs`}
+    </button>
+  )}
+</div>
               </article>
             ))}
           </div>
@@ -410,6 +869,8 @@ function NewThreatAnalysis() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [enriching, setEnriching] = useState(false);
+const [enrichmentMessage, setEnrichmentMessage] = useState("");
   const [showEnrichment, setShowEnrichment] = useState(false);
   const [enrichment, setEnrichment] = useState({
     IP: "", ASN: "", Registrar: "", Cert_Fingerprint: "",
@@ -439,6 +900,56 @@ function NewThreatAnalysis() {
   function updateEnrichment(field, value) {
     setEnrichment((previous) => ({ ...previous, [field]: value }));
   }
+  async function autoEnrichIOC() {
+  if (!ioc.trim()) {
+    setEnrichmentMessage("Enter a domain first.");
+    return;
+  }
+
+  setEnriching(true);
+  setEnrichmentMessage("Resolving domain...");
+
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:8000/enrich-ioc",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domain: ioc.trim(),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "IOC enrichment failed."
+      );
+    }
+
+    if (data.ip_addresses?.length > 0) {
+      setShowEnrichment(true);
+
+      updateEnrichment("IP", data.ip_addresses[0]);
+
+      setEnrichmentMessage(
+        `DNS resolved. Found ${data.ip_addresses.length} IP address(es): ${data.ip_addresses.join(", ")}. First IP populated in the field.`
+      );
+    } else {
+      setEnrichmentMessage(
+        data.warning || "No IP addresses found."
+      );
+    }
+  } catch (err) {
+    setEnrichmentMessage(err.message);
+  } finally {
+    setEnriching(false);
+  }
+}
 
   function clearEnrichment() {
     setEnrichment({
@@ -514,6 +1025,7 @@ function NewThreatAnalysis() {
   }
 
    const topMatch = result?.top_match;
+   const attribution = result?.attribution;
   const rankedCandidates = Array.isArray(result?.ranked_candidates) ? result.ranked_candidates : [];
 
   return (
@@ -562,6 +1074,25 @@ function NewThreatAnalysis() {
         </div>
 
         <div className="nta-enrichment">
+          <div className="nta-auto-enrich">
+  <button
+    type="button"
+    className="button button-secondary"
+    onClick={() => {
+      setShowEnrichment(true);
+      autoEnrichIOC();
+    }}
+    disabled={enriching || !ioc.trim()}
+  >
+    {enriching ? "Enriching..." : "Auto Enrich IOC"}
+  </button>
+
+  {enrichmentMessage && (
+    <p className="nta-enrichment-note">
+      {enrichmentMessage}
+    </p>
+  )}
+</div>
           <button type="button" className="button button-secondary nta-enrichment-toggle" onClick={() => setShowEnrichment((current) => !current)}>
             {showEnrichment ? "Hide enrichment fields" : "Add enrichment details"}
             <ChevronDown size={16} />
@@ -644,7 +1175,54 @@ function NewThreatAnalysis() {
     </p>
   </div>
 )}
+{attribution && (
+  <div className="campaign-match-details">
+    <h3>Threat Actor Attribution</h3>
 
+    <p>
+      <strong>Attribution status: </strong>
+      {attribution.attribution_status || "Unavailable"}
+    </p>
+
+    <p>
+      <strong>Candidate actor: </strong>
+      {attribution.candidate_actor || "No actor attributed"}
+    </p>
+
+    <p>
+      <strong>Dataset attribution confidence: </strong>
+      {attribution.dataset_attribution_confidence || "Unavailable"}
+    </p>
+
+    <p>
+      <strong>Reference campaign: </strong>
+      {attribution.reference_campaign_id || "Unavailable"}
+    </p>
+
+    <p>
+      <strong>Campaign label: </strong>
+      {attribution.reference_campaign_label || "Unavailable"}
+    </p>
+
+    {Array.isArray(attribution.attribution_rationale) &&
+      attribution.attribution_rationale.length > 0 && (
+        <div>
+          <strong>Attribution rationale:</strong>
+          <ul>
+            {attribution.attribution_rationale.map((reason, index) => (
+              <li key={index}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+    {attribution.warning && (
+      <p className="chart-footnote">
+        {attribution.warning}
+      </p>
+    )}
+  </div>
+)}
 <p className="chart-footnote">
   {result.note || "Similarity scores require analyst review."}
 </p>
@@ -687,32 +1265,281 @@ function NewThreatAnalysis() {
   );
 }
 
-function RelationshipGraph() {
-  const nodes = [
-    { x: 50, y: 12, label: "IOC", tone: "node-blue" },
-    { x: 22, y: 42, label: "CAMP-01", tone: "node-purple" },
-    { x: 78, y: 42, label: "CAMP-03", tone: "node-green" },
-    { x: 22, y: 76, label: "SideCopy", tone: "node-purple" },
-    { x: 78, y: 76, label: "Transparent Tribe", tone: "node-green" },
-  ];
 
-   return (
+function RelationshipGraph() {
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchCampaigns() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch("http://127.0.0.1:8000/campaigns");
+
+        if (!response.ok) {
+          throw new Error("Unable to load campaign profiles.");
+        }
+
+        const data = await response.json();
+
+        if (active) {
+          setProfiles(Array.isArray(data.profiles) ? data.profiles : []);
+        }
+      } catch (err) {
+        if (active) setError(err.message || "Failed to load graph data.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    fetchCampaigns();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const graphWidth = Math.max(900, profiles.length * 230);
+  const graphHeight = 600;
+
+  const campaignPositions = profiles.map((profile, index) => ({
+    x: 120 + index * 230,
+    y: 100,
+    profile,
+  }));
+
+  const selectedProfile = profiles.find(
+    (profile) => profile.campaign_profile_id === selectedCampaign
+  );
+
+  return (
     <>
-      <div className="page-heading"><div><div className="eyebrow">LINK ANALYSIS</div><h1>Relationship Graph</h1><p>Explore how indicators, campaigns and actors may be related.</p></div><Badge>Illustrative graph</Badge></div>
-      <section className="panel graph-panel">
-        <div className="panel-heading"><div><h2>IOC relationship map</h2><p>Example structure — not calculated from live evidence</p></div><button className="button button-secondary" onClick={() => window.print()}><Download size={16} /> Export</button></div>
-        <div className="graph-canvas">
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <line x1="50" y1="15" x2="22" y2="42" /><line x1="50" y1="15" x2="78" y2="42" /><line x1="22" y1="46" x2="22" y2="76" /><line x1="78" y1="46" x2="78" y2="76" />
-          </svg>
-          {nodes.map((node) => <div key={node.label} className={`graph-node ${node.tone}`} style={{ left: `${node.x}%`, top: `${node.y}%` }}>{node.label}</div>)}
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">LINK ANALYSIS</div>
+          <h1>Relationship Graph</h1>
+          <p>Explore discovered campaigns, their indicators and shared infrastructure.</p>
         </div>
-        <div className="graph-legend"><span><i className="legend-dot blue-dot" /> Indicator</span><span><i className="legend-dot purple-dot" /> Campaign</span><span><i className="legend-dot green-dot" /> Potential actor</span></div>
-        <div className="notice"><CircleHelp size={18} /><div><strong>Relationship is not proof of attribution.</strong><p>Edges in the production graph should be based on documented evidence and confidence.</p></div></div>
+        <Badge>Live campaign data</Badge>
+      </div>
+
+      <section className="panel graph-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>IOC relationship map</h2>
+            <p>Connections are derived from discovered campaign profile membership.</p>
+          </div>
+          <button
+            className="button button-secondary"
+            onClick={() => window.print()}
+          >
+            <Download size={16} /> Export
+          </button>
+        </div>
+
+        {loading && <p>Loading campaign relationships...</p>}
+
+        {error && (
+          <div className="notice">
+            <CircleHelp size={18} />
+            <div>
+              <strong>Unable to load graph</strong>
+              <p>{error}</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && profiles.length === 0 && (
+          <p>No campaign profiles are available.</p>
+        )}
+
+        {!loading && !error && profiles.length > 0 && (
+          <>
+            <div style={{ overflowX: "auto", padding: "12px 0" }}>
+              <svg
+                viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                style={{ width: "100%", minWidth: "900px", height: "600px" }}
+                role="img"
+                aria-label="Campaign and IOC relationship graph"
+              >
+                {campaignPositions.map(({ x, y, profile }) => {
+                  const members = profile.members || [];
+                  const memberSpacing = Math.min(
+                    65,
+                    300 / Math.max(members.length, 1)
+                  );
+
+                  const infrastructure = Object.entries(
+                    profile.shared_infrastructure || {}
+                  ).filter(([, value]) => value);
+
+                  return (
+                    <g key={profile.campaign_profile_id}>
+                      {members.map((member, index) => {
+                        const memberY =
+                          245 + index * memberSpacing;
+
+                        return (
+                          <g key={member.IOC}>
+                            <line
+                              x1={x}
+                              y1={y + 25}
+                              x2={x}
+                              y2={memberY - 12}
+                              stroke="#94a3b8"
+                              strokeWidth="1.5"
+                            />
+                            <rect
+                              x={x - 90}
+                              y={memberY - 12}
+                              width="180"
+                              height="28"
+                              rx="6"
+                              fill="#dbeafe"
+                              stroke="#3b82f6"
+                            />
+                            <text
+                              x={x}
+                              y={memberY + 6}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill="#1e3a8a"
+                            >
+                              {member.IOC.length > 27
+                                ? `${member.IOC.slice(0, 24)}...`
+                                : member.IOC}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      <rect
+                        x={x - 85}
+                        y={y - 25}
+                        width="170"
+                        height="50"
+                        rx="9"
+                        fill="#ede9fe"
+                        stroke="#8b5cf6"
+                        strokeWidth="2"
+                      />
+                      <text
+                        x={x}
+                        y={y + 5}
+                        textAnchor="middle"
+                        fontSize="14"
+                        fontWeight="bold"
+                        fill="#5b21b6"
+                      >
+                        {profile.campaign_profile_id}
+                      </text>
+
+                      {infrastructure.slice(0, 4).map(
+                        ([key, value], index) => (
+                          <text
+                            key={key}
+                            x={x}
+                            y={525 + index * 17}
+                            textAnchor="middle"
+                            fontSize="10"
+                            fill="#475569"
+                          >
+                            {key}: {String(value).slice(0, 22)}
+                          </text>
+                        )
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+
+            <div className="graph-legend">
+              <span>
+                <i className="legend-dot blue-dot" /> IOC
+              </span>
+              <span>
+                <i className="legend-dot purple-dot" /> Campaign
+              </span>
+            </div>
+
+            <div className="campaign-detail-grid">
+              {profiles.map((profile) => (
+                <button
+                  type="button"
+                  key={profile.campaign_profile_id}
+                  className="button button-secondary"
+                  onClick={() =>
+                    setSelectedCampaign(
+                      selectedCampaign === profile.campaign_profile_id
+                        ? null
+                        : profile.campaign_profile_id
+                    )
+                  }
+                >
+                  {profile.campaign_profile_id} · {profile.member_count} IOCs
+                </button>
+              ))}
+            </div>
+
+            {selectedProfile && (
+              <div className="campaign-match-details">
+                <h3>{selectedProfile.campaign_profile_id} details</h3>
+                <p>
+                  <strong>Status: </strong>
+                  {selectedProfile.status}
+                </p>
+                <p>
+                  <strong>Target sectors: </strong>
+                  {(selectedProfile.target_sectors || []).join(", ") || "Unavailable"}
+                </p>
+                <p>
+                  <strong>Target regions: </strong>
+                  {(selectedProfile.target_regions || []).join(", ") || "Unavailable"}
+                </p>
+                <p><strong>Campaign IOCs:</strong></p>
+                <ul>
+                  {(selectedProfile.members || []).map((member) => (
+                    <li key={member.IOC}>{member.IOC}</li>
+                  ))}
+                </ul>
+                <p><strong>Shared infrastructure:</strong></p>
+                <ul>
+                  {Object.entries(selectedProfile.shared_infrastructure || {}).map(
+                    ([key, value]) => (
+                      <li key={key}>
+                        {key}: {String(value)}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="notice">
+          <CircleHelp size={18} />
+          <div>
+            <strong>Relationship is not proof of attribution.</strong>
+            <p>
+              IOC-to-campaign links represent discovered profile membership.
+              Shared infrastructure is supporting similarity evidence, not
+              proof of common ownership or threat actor identity.
+            </p>
+          </div>
+        </div>
       </section>
     </>
   );
 }
+
 
 export default function App() {
   const [backendConnected, setBackendConnected] = useState(false);
@@ -747,6 +1574,7 @@ export default function App() {
   const pageComponents = {
     Dashboard: <Overview setPage={setPage} />,
     "IOC Search": <IOCSearch />,
+    "IOC History": <IOCHistory />,
     "Campaign Explorer": <CampaignExplorer />,
     "New Threat Analysis": <NewThreatAnalysis />,
     "Relationship Graph": <RelationshipGraph />,

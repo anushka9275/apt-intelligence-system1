@@ -65,6 +65,20 @@ button{cursor:pointer}
   margin: 7px 0;
   overflow-wrap: anywhere;
 }
+.campaign-members-toggle {
+  background: transparent;
+  border: none;
+  color: #8eb8ff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.campaign-members-toggle:hover {
+  color: #ffffff;
+}
 
 .campaign-detail {
   margin-top: 15px;
@@ -146,4 +160,72 @@ button{cursor:pointer}
 
 .campaign-match-details strong {
   color: #e5eaf3;
+}
+/* Campaign Intelligence */
+
+.campaign-intelligence {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #2a3549;
+}
+
+.campaign-intelligence h4 {
+  color: #8eb8ff;
+  font-size: 11px;
+  margin: 0 0 12px;
+}
+
+.campaign-intelligence-item {
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.campaign-intelligence-item > span {
+  display: block;
+  font-size: 9px;
+  color: #7588a8;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.campaign-intelligence-item > strong {
+  display: block;
+  font-size: 10px;
+  color: #d5deed;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.campaign-theme-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.campaign-theme-list span {
+  background: #202e43;
+  border: 1px solid #34445e;
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: #c3d4ed;
+  font-size: 9px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.campaign-infrastructure-list p {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.5fr);
+  gap: 8px;
+  margin: 6px 0;
+  color: #b9c7dc;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.campaign-infrastructure-list p strong {
+  color: #8eb8ff;
+  font-weight: 500;
+  text-transform: capitalize;
 }

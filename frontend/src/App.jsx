@@ -16,23 +16,6 @@ const navItems = [
   { label: "Relationship Graph", icon: Network, group: "INTELLIGENCE" },
 ];
 
-const campaigns = [
-  { id: "CAMP-01", name: "SideCopy", iocs: 5, confidence: "High", color: "purple" },
-  { id: "CAMP-02", name: "Patchwork", iocs: 4, confidence: "Medium", color: "blue" },
-  { id: "CAMP-03", name: "Transparent Tribe", iocs: 5, confidence: "High", color: "green" },
-  { id: "CAMP-04", name: "DoNot Team", iocs: 4, confidence: "Low", color: "orange" },
-  { id: "CAMP-05", name: "Unattributed", iocs: 5, confidence: "Unconfirmed", color: "gray" },
-  { id: "CAMP-06", name: "Bitter APT", iocs: 5, confidence: "Medium", color: "blue" },
-  { id: "CAMP-07", name: "Confucius", iocs: 3, confidence: "Medium", color: "purple" },
-  { id: "CAMP-08", name: "Mustang Panda", iocs: 3, confidence: "Medium", color: "green" },
-];
-
-const sampleIOCs = [
-  { value: "secure-mod-gov.in.example", type: "Domain", verdict: "Suspicious", campaign: "DISC-01", confidence: "High" },
-  { value: "random-verify-8472.test", type: "Domain", verdict: "Suspicious", campaign: "No established match", confidence: "Low" },
-  { value: "example-login-check.com", type: "Domain", verdict: "Needs review", campaign: "Unassigned", confidence: "Low" },
-];
-
 function Badge({ children, tone = "gray" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
@@ -88,7 +71,7 @@ useEffect(() => {
   });
 
   const [campaignLoading, setCampaignLoading] = useState(true);
-  const [campaignError, setCampaignError] = useState("");
+  const [, setCampaignError] = useState("");
   const [recentIOCs, setRecentIOCs] = useState([]);
 const [historyLoading, setHistoryLoading] = useState(true);
 const [historyError, setHistoryError] = useState("");
@@ -369,9 +352,12 @@ function IOCSearch() {
 
 
 function IOCHistory() {
+  function refreshHistory() {
+  setLoading(true);
+  setError("");
+  fetchHistory();
+}
   const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("All");
 
@@ -460,7 +446,7 @@ function exportCSV() {
 
         <button
           className="button button-secondary"
-          onClick={fetchHistory}
+          onClick={refreshHistory}
           disabled={loading}
         >
           {loading ? "Loading..." : "Refresh History"}

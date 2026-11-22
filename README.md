@@ -1,261 +1,451 @@
 # APT Intelligence System
 
-## Project Overview
+An integrated threat intelligence platform for domain classification, phishing IOC analysis, campaign discovery, infrastructure correlation, and potential APT attribution.
 
-The **APT Intelligence System** is a cybersecurity platform designed to support domain classification, phishing IOC analysis, campaign discovery, IOC correlation, and potential Advanced Persistent Threat (APT) attribution.
+The system combines machine learning, heuristic campaign matching, automated DNS enrichment, an investigation assistant, and PDF report generation through a web-based analyst dashboard.
 
-The system combines machine learning, campaign-profile matching, and an interactive React dashboard to help analysts investigate suspicious indicators and identify possible relationships with previously observed campaigns.
+## 1. Project Overview
 
-## Key Features
+The APT Intelligence System helps analysts investigate suspicious domains and phishing indicators by:
 
-- **IOC Search:** Analyse domain indicators using the trained domain-classification model.
-- **Campaign Explorer:** Explore discovered campaign profiles and their associated IOCs.
-- **New Threat Analysis:** Submit a new IOC with enrichment information and compare it against existing campaign profiles.
-- **Relationship Graph:** Visualise relationships between threat indicators and campaigns.
-- **Domain Classification:** Classify domain strings as benign or suspicious.
-- **Campaign Matching:** Identify potential campaign matches using IOC enrichment and similarity-based evidence.
-- **Potential APT Attribution:** Present candidate threat-actor associations with supporting evidence.
+- Classifying domains as benign or suspicious using a machine learning model.
+- Comparing incoming IOCs against discovered campaign profiles.
+- Identifying shared infrastructure and campaign characteristics.
+- Generating potential threat actor attribution candidates.
+- Resolving domain DNS information for basic IOC enrichment.
+- Producing structured investigation summaries and downloadable PDF reports.
+- Maintaining an IOC prediction history using MongoDB Atlas.
 
-## Technology Stack
+The system is designed to support threat investigation and analyst decision-making. Its predictions and attribution results are preliminary indicators, not confirmed security verdicts.
 
-| Component | Technology |
+## 2. Key Features
+
+### IOC Search
+- Domain classification through a trained machine learning model.
+- Suspicious and benign prediction labels.
+- Model confidence scores.
+- Prediction history storage through MongoDB.
+
+### Campaign Explorer
+- Dynamically loads discovered campaign profiles.
+- Displays campaign status, cluster size, and similarity threshold.
+- Shows target sectors, regions, and lure themes.
+- Displays shared infrastructure characteristics.
+- Provides access to IOC members within discovered clusters.
+
+### New Threat Analysis
+- Accepts a new IOC and its available enrichment information.
+- Compares the IOC against existing campaign profiles.
+- Calculates similarity scores using available infrastructure and campaign evidence.
+- Identifies potential campaign matches.
+- Provides candidate threat actor attribution when sufficient evidence is available.
+- Displays supporting evidence and attribution rationales.
+
+### Relationship Graph
+- Dynamically visualizes discovered campaign profiles and their associated IOCs.
+- Shows IOC-to-campaign relationships.
+- Supports campaign selection and investigation.
+
+### Automated IOC Enrichment
+- Performs DNS resolution for submitted domains.
+- Retrieves resolved IP addresses and hostname information.
+- Displays DNS enrichment status and limitations.
+
+### Investigation Assistant
+- Produces a structured, rule-based investigation summary.
+- Highlights key findings, uncertainties, and recommended analyst actions.
+- Explains why a candidate campaign match may or may not be reliable.
+
+### PDF Investigation Reports
+- Generates downloadable PDF reports.
+- Includes IOC details, enrichment information, campaign analysis, attribution results, and analyst notes.
+
+### IOC History
+- Stores successful domain predictions in MongoDB Atlas.
+- Retrieves recent investigation records.
+- Supports searching, filtering, refreshing, and CSV export.
+
+## 3. Technology Stack
+
+| Component | Technologies |
 |---|---|
-| Frontend | React, Vite, JavaScript, CSS |
-| Backend API | Python, FastAPI |
-| Machine Learning | Scikit-learn |
-| Model Storage | Joblib |
+| Frontend | React 19, Vite 8, JavaScript, CSS |
+| Icons | Lucide React |
+| Backend | Node.js, Express 5 |
+| Database | MongoDB Atlas |
+| ML API | Python 3.14, FastAPI, Uvicorn |
+| Machine Learning | Scikit-learn, TF-IDF, Logistic Regression |
 | Data Processing | Pandas, NumPy |
-| Frontend Package Management | npm |
+| Model Persistence | Joblib |
+| PDF Generation | ReportLab |
+| Version Control | Git, GitHub |
 
-## Project Structure
+## 4. System Architecture
+
+The application consists of three main layers.
+
+1. **React frontend:** Provides the analyst dashboard and investigation interface.
+2. **Node.js backend:** Handles domain prediction requests, communicates with the Python API, and stores prediction history in MongoDB Atlas.
+3. **Python FastAPI service:** Loads the trained model, processes IOC and campaign analysis requests, performs DNS enrichment, and generates investigation reports.
+
+The frontend communicates with the Python API for campaign analysis, enrichment, investigation assistance, and report generation. The Express backend handles IOC prediction requests and MongoDB history operations.
+
+### Architecture Flow
 
 ```text
-apt-intelligence-system/
+                 ANALYST
+                    |
+                    v
+             REACT FRONTEND
+               (Vite :5173)
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+    EXPRESS BACKEND       PYTHON FASTAPI
+       (:5000)                (:8000)
+          |                    |
+          v                    +------------------+
+    MONGODB ATLAS              |                  |
+    IOC History                v                  v
+                         DOMAIN CLASSIFIER   CAMPAIGN ENGINE
+                                                  |
+                                       +----------+----------+
+                                       |          |          |
+                                       v          v          v
+                                  Attribution  Enrichment  Investigation
+                                       |          |          |
+                                       +----------+----------+
+                                                  |
+                                                  v
+                                           PDF REPORT
+```
+
+## 5. Project Structure
+
+```text
+apt_system/
 │
 ├── api/
 │   └── main.py
 │
+├── backend/
+│   ├── server.js
+│   ├── package.json
+│   ├── package-lock.json
+│   └── .env
+│
 ├── frontend/
 │   ├── public/
 │   ├── src/
+│   │   ├── App.jsx
+│   │   └── App.css
 │   ├── package.json
 │   ├── package-lock.json
 │   └── vite.config.js
 │
 ├── ml/
-│   ├── classification/
-│   ├── campaigns/
-│   │   └── match_new_ioc.py
 │   ├── attribution/
+│   ├── campaigns/
+│   ├── classification/
 │   ├── common/
 │   └── evaluation/
 │
-├── model_artifacts/
-│   └── domain_classifier.joblib
-│
 ├── datasets/
-│   └── processed/
-│       └── campaign_profiles.json
+│   ├── external/
+│   ├── processed/
+│   │   ├── domain_classifier.joblib
+│   │   └── campaign_profiles.json
+│   └── raw/
+│
+├── model_artifacts/
+│
+├── reports/
 │
 ├── requirements.txt
-├── .gitignore
-└── README.md
+├── README.md
+└── .gitignore
 ```
 
-Some training datasets, intermediate results, and evaluation files are excluded from the repository. The campaign profile JSON and trained domain-classification model required by the current API are included.
+The `datasets/raw` and `datasets/external` directories contain local dataset material. Not all datasets and intermediate evaluation outputs are included in version control.
 
-## Prerequisites
+The trained domain classifier and campaign profile files are required by the API.
 
-Install the following software before running the project:
+## 6. Prerequisites
 
-- Python 3.14
+Install the following before setting up the project:
+
+- Python 3.14.0
 - Node.js and npm
 - Git
+- A MongoDB Atlas account and database
 
-## Installation and Setup
+MongoDB Atlas must be configured with a database user and an appropriate network access rule for the machine running the application.
 
-### 1. Clone the Repository
+## 7. Installation and Setup
 
-```bash
+Clone the repository:
+
+```powershell
 git clone https://github.com/anushka9275/apt-intelligence-system1.git
-```
-
-Navigate into the project:
-
-```bash
 cd apt-intelligence-system1
 ```
 
-### 2. Set Up the Python Backend
+### A. Python FastAPI Setup
 
-Create a virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Activate it on Windows PowerShell:
+Create and activate a virtual environment:
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-If PowerShell blocks script execution:
+Install the Python dependencies:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-```
-
-Install dependencies:
-
-```bash
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-Start the backend from the project root:
+The Python dependencies include:
 
-```bash
-python -m uvicorn api.main:app --reload
+- FastAPI
+- Uvicorn
+- Joblib
+- NumPy
+- Pandas
+- Scikit-learn
+
+Verify that the trained model and campaign profiles are present:
+
+```powershell
+Test-Path .\datasets\processed\domain_classifier.joblib
+Test-Path .\datasets\processed\campaign_profiles.json
 ```
 
-Backend URL:
+Both commands should return `True`.
 
-```text
-http://127.0.0.1:8000
+Start the Python API:
+
+```powershell
+python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 3. Set Up the React Frontend
+The API will be available at:
 
-Open a second terminal:
+`http://127.0.0.1:8000`
 
-```bash
-cd frontend
-```
+### B. Node.js and Express Backend Setup
 
-Install dependencies:
+Open a separate terminal:
 
-```bash
+```powershell
+cd apt-intelligence-system1\backend
 npm ci
 ```
 
-Start the development server:
+Create a `.env` file inside the `backend` directory:
 
-```bash
+```env
+MONGODB_URI=your_mongodb_atlas_connection_string
+DB_NAME=drdo_apt_db
+ML_API_URL=http://127.0.0.1:8000
+PORT=5000
+```
+
+Replace the MongoDB connection string placeholder with your own Atlas connection string. Do not commit this file or share its credentials.
+
+Start the backend:
+
+```powershell
+npm start
+```
+
+The backend will be available at:
+
+`http://localhost:5000`
+
+On successful startup, the terminal should display a MongoDB connection confirmation and the backend address.
+
+### C. React Frontend Setup
+
+Open another terminal:
+
+```powershell
+cd apt-intelligence-system1\frontend
+npm ci
 npm run dev
 ```
 
-Open the URL displayed by Vite, usually:
+The frontend will be available at:
 
-```text
-http://localhost:5173
-```
+`http://localhost:5173`
 
-Keep both terminals running while using the application.
+### Running the Complete Application
 
-## API Endpoints
+Keep all three services running simultaneously:
+
+| Service | Port | Command |
+|---|---:|---|
+| React frontend | 5173 | `npm run dev` |
+| Express backend | 5000 | `npm start` |
+| FastAPI service | 8000 | `python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000` |
+
+Open `http://localhost:5173` in your browser.
+
+## 8. API Endpoints
+
+### Python FastAPI
+
+Base URL: `http://127.0.0.1:8000`
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/` | API home |
-| GET | `/health` | Backend health check |
-| GET | `/campaigns` | Retrieve campaign profiles |
-| POST | `/predict` | Domain classification |
-| POST | `/campaign-match` | Match a new IOC against campaign profiles |
+| GET | `/` | API information |
+| GET | `/health` | API and model health status |
+| GET | `/campaigns` | Retrieve discovered campaign profiles |
+| GET | `/campaign-stats` | Retrieve campaign statistics |
+| POST | `/predict` | Classify a domain |
+| POST | `/campaign-match` | Match an IOC against campaign profiles |
+| POST | `/enrich-ioc` | Perform basic IOC DNS enrichment |
+| POST | `/generate-report` | Generate a PDF investigation report |
+| POST | `/investigation-assistant` | Generate a structured investigation summary |
 
-Interactive API documentation:
+### Node.js Express Backend
 
-```text
-http://127.0.0.1:8000/docs
-```
+Base URL: `http://localhost:5000`
 
-## Machine Learning Components
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/` | Backend health information |
+| GET | `/api/health` | Backend and FastAPI connectivity check |
+| GET | `/api/ioc-history` | Retrieve saved IOC prediction history |
+| POST | `/api/predict` | Forward domain prediction and save the result |
+
+The Express health endpoint checks connectivity with the Python API. MongoDB connectivity is established separately during backend startup.
+
+## 9. Machine Learning and Campaign Analysis
 
 ### Domain Classification
 
-The domain-classification component uses character-level TF-IDF features and Logistic Regression.
+The domain classification component uses:
 
-It classifies domain strings into:
+- Character-level TF-IDF feature extraction.
+- Logistic Regression classification.
+- A trained model persisted using Joblib.
 
-- `benign`
-- `suspicious`
+The current dataset contains 625 labelled domain records:
 
-The trained model is stored at:
-
-```text
-model_artifacts/domain_classifier.joblib
-```
-
-The current dataset contains 625 labelled records:
-
-| Label | Records |
+| Category | Records |
 |---|---:|
-| Suspicious | 497 |
 | Benign | 128 |
+| Suspicious | 497 |
 | Total | 625 |
 
-The previously recorded evaluation reported 100% accuracy on a 125-record test split. However, subsequent manual testing identified false positives involving legitimate popular domains.
+The reported test evaluation achieved 100% accuracy on its 125-record test split. However, this result should not be interpreted as guaranteed real-world accuracy. Manual checks have identified false-positive predictions on legitimate popular domains.
 
-**Important:** Predictions are preliminary indicators, not verified threat verdicts. The model requires further validation before operational deployment.
+Predictions should therefore be treated as preliminary risk indicators requiring additional verification.
 
 ### Campaign Discovery and Matching
 
-The campaign-analysis component uses IOC enrichment and similarity-based comparisons to identify potential relationships between new indicators and existing campaign profiles.
-
-Enrichment attributes include:
+The campaign analysis component uses available IOC and infrastructure characteristics, including:
 
 - IP address and ASN
 - Registrar
-- Certificate fingerprint
+- Certificate fingerprint and issuer
 - Domain age
 - Favicon hash
 - HTML similarity
 - Kit fuzzy hash
+- Subdomain patterns
 - Target sector and region
 - Lure theme
-- Subdomain patterns
 
-The API compares submitted indicators against available campaign profiles and returns ranked candidates with similarity scores and supporting evidence.
+Campaign matching uses weighted evidence comparisons against discovered campaign profiles.
 
-Similarity scores are heuristic measures, not probabilities. A candidate match does not establish confirmed campaign membership or threat-actor attribution. Analyst verification is required.
+The current campaign dataset contains 68 records and produces eight discovered campaign profiles, with 34 records clustered and 34 left unclustered.
 
-## Testing the Application
+A similarity score is a heuristic evidence score, not a calibrated probability that two IOCs belong to the same campaign.
 
-1. Start the backend.
-2. Start the frontend.
-3. Open the React dashboard.
-4. Test domain classification through IOC Search.
-5. Open Campaign Explorer to inspect campaign profiles.
-6. Submit an IOC through New Threat Analysis.
-7. Review ranked campaign candidates and supporting evidence.
-8. Use `/docs` to test backend endpoints independently.
+### Potential APT Attribution
 
-## Current Limitations
+The attribution component uses campaign matching results and available dataset attribution information to identify a candidate threat actor.
 
-- The domain classifier requires additional validation and false-positive reduction.
-- Campaign matching relies on available campaign profiles and enrichment attributes.
-- Campaign similarity is heuristic and should not be interpreted as a probability.
-- A missing campaign match does not establish that an IOC is benign.
-- APT attribution is tentative and requires independent threat-intelligence evidence.
-- Relationship Graph functionality may be subject to further development.
+Attribution output includes:
 
-## Future Enhancements
+- Candidate actor
+- Reference campaign
+- Attribution confidence from the source dataset
+- Supporting evidence and rationales
+- Analyst review warnings
 
-1. Improve domain-classification accuracy and generalisation.
-2. Expand and validate campaign datasets.
-3. Integrate automated IOC enrichment.
-4. Improve campaign correlation and attribution.
-5. Develop interactive relationship visualisation.
-6. Add persistent storage and database integration.
-7. Introduce additional validation, logging, and security controls.
-8. Evaluate the system against independent threat-intelligence datasets.
+An attribution candidate is not proof of actor identity or campaign ownership. Dataset labels are not independently verified attribution findings.
 
-## Data Handling
+## 10. Automated Enrichment and Investigation Assistant
 
-Raw datasets and intermediate analysis files are excluded from this repository. Only files required for the current application setup are included.
+### IOC Enrichment
 
-Project code, model artifacts, and reports should be shared only with authorised reviewers and in accordance with applicable organisational requirements.
+The current automated enrichment functionality performs system DNS resolution and retrieves resolved IP addresses and related hostname information.
 
-## Author
+It does not yet provide comprehensive automated ASN, WHOIS, certificate, passive DNS, or threat-feed enrichment.
 
-Developed as a cybersecurity and threat-intelligence project focused on APT investigation, phishing campaign discovery, IOC correlation, and machine-learning-assisted threat analysis.
+### Investigation Assistant
+
+The investigation assistant is a deterministic, rule-based component. It organizes campaign matching and enrichment results into:
+
+- Investigation summary
+- Key findings
+- Uncertainties and limitations
+- Recommended analyst actions
+
+It is not an LLM-based autonomous agent. Its output is grounded in the information already available to the system.
+
+## 11. Testing
+
+After starting all three services, verify the following:
+
+1. Open the dashboard and confirm that the backend connection is healthy.
+2. Submit a domain through IOC Search and verify the classification result.
+3. Open IOC History and confirm that successful predictions are saved.
+4. Open Campaign Explorer and verify that campaign profiles load.
+5. Open Relationship Graph and test campaign selection.
+6. Submit an IOC through New Threat Analysis and inspect its matching evidence.
+7. Test automated DNS enrichment with a valid domain.
+8. Generate an investigation summary and inspect its findings and limitations.
+9. Download and open a PDF investigation report.
+
+For a production-quality assessment, additional testing with independent datasets and broader edge cases is required.
+
+## 12. Limitations and Responsible Use
+
+- The domain classifier has been trained and evaluated on a relatively small labelled dataset.
+- A high test-split score does not guarantee reliable predictions on unseen real-world domains.
+- Campaign matching uses heuristic similarity scores and should not be interpreted as a probability.
+- The campaign dataset includes sample and synthetic/test-style indicators, including `.example` domains and reserved documentation IP addresses.
+- Campaign and threat actor labels reflect the supplied dataset and are not independent confirmation of real-world attribution.
+- DNS resolution alone does not establish whether an IOC is malicious.
+- A missing campaign match does not mean that an IOC is benign.
+- Shared infrastructure is supporting evidence, not proof of common ownership.
+- Attribution and investigation outputs require analyst validation.
+- The application is a research and demonstration platform, not a replacement for a production threat intelligence or incident response system.
+
+## 13. Future Enhancements
+
+Potential future improvements include:
+
+- Integration with external threat intelligence feeds.
+- Automated ASN, WHOIS, certificate, and passive DNS enrichment.
+- Larger and independently validated datasets.
+- Improved campaign similarity evaluation and calibration.
+- More advanced graph exploration and relationship analysis.
+- Analyst authentication and role-based access control.
+- Audit logging and investigation case management.
+- Production deployment, monitoring, and security hardening.
+
+## 14. Author
+
+Developed as part of a cybersecurity and APT threat intelligence project.
+
+**Project:** APT Intelligence System
+
+**Focus Areas:** Cybersecurity, Threat Intelligence, Machine Learning, IOC Analysis, Campaign Correlation, and APT Attribution.

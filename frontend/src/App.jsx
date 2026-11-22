@@ -871,6 +871,9 @@ function NewThreatAnalysis() {
   const [error, setError] = useState("");
   const [enriching, setEnriching] = useState(false);
 const [enrichmentMessage, setEnrichmentMessage] = useState("");
+const [assistantResult, setAssistantResult] = useState(null);
+const [assistantLoading, setAssistantLoading] = useState(false);
+const [assistantError, setAssistantError] = useState("");
   const [showEnrichment, setShowEnrichment] = useState(false);
   const [enrichment, setEnrichment] = useState({
     IP: "", ASN: "", Registrar: "", Cert_Fingerprint: "",
@@ -1021,6 +1024,93 @@ const [enrichmentMessage, setEnrichmentMessage] = useState("");
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadInvestigationReport() {
+    if (!result || !ioc.trim()) return;
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/generate-report",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ioc: ioc.trim(),
+            enrichment: enrichment,
+            analysis_result: result,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.detail || "Could not generate PDF report."
+        );
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "APT_Investigation_Report.pdf";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(downloadUrl);
+
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+  async function runInvestigationAssistant() {
+    if (!result || !ioc.trim()) return;
+
+    setAssistantLoading(true);
+    setAssistantError("");
+    setAssistantResult(null);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/investigation-assistant",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ioc: ioc.trim(),
+            analysis_result: result,
+            enrichment: enrichment,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Investigation Assistant request failed."
+        );
+      }
+
+      setAssistantResult(data);
+
+    } catch (err) {
+      setAssistantError(
+        err.message === "Failed to fetch"
+          ? "Cannot reach the Python API. Make sure FastAPI is running on port 8000."
+          : err.message
+      );
+    } finally {
+      setAssistantLoading(false);
     }
   }
 
@@ -1223,6 +1313,71 @@ const [enrichmentMessage, setEnrichmentMessage] = useState("");
     )}
   </div>
 )}
+
+          <div className="nta-enrichment-actions">
+  <button
+    type="button"
+    className="button button-primary"
+    onClick={runInvestigationAssistant}
+    disabled={assistantLoading}
+  >
+    {assistantLoading ? "Generating Analysis..." : "Run Investigation Assistant"}
+  </button>
+
+  <button
+    type="button"
+    className="button button-primary"
+    onClick={downloadInvestigationReport}
+  >
+    <Download size={16} />
+    Download Investigation Report
+  </button>
+</div>
+
+{assistantError && (
+  <p className="error-message">
+    {assistantError}
+  </p>
+)}
+
+{assistantResult && (
+  <div className="nta-assistant-panel">
+    <h3>Investigation Assistant</h3>
+
+    <p className="chart-footnote">
+      {assistantResult.assistant_type}
+    </p>
+
+    <h4>Investigation Summary</h4>
+    <p>{assistantResult.summary}</p>
+
+    <h4>Key Findings</h4>
+    <ul>
+      {assistantResult.findings.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+
+    <h4>Uncertainties and Limitations</h4>
+    <ul>
+      {assistantResult.uncertainties.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+
+    <h4>Recommended Analyst Actions</h4>
+    <ul>
+      {assistantResult.recommended_actions.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+
+    <p className="chart-footnote">
+      {assistantResult.disclaimer}
+    </p>
+  </div>
+)}
+
 <p className="chart-footnote">
   {result.note || "Similarity scores require analyst review."}
 </p>
@@ -1635,7 +1790,10 @@ export default function App() {
           </div>
         </header>
         <div className="content-area">{pageComponents[page] || pageComponents.Dashboard}</div>
-        <footer className="app-footer"><span><ShieldCheck size={14} /> APT Intelligence System</span><span>Frontend prototype <i /> Data is illustrative until connected</span></footer>
+        <footer className="app-footer">
+  <span><ShieldCheck size={14} /> APT Intelligence System</span>
+  <span>Integrated Intelligence Platform <i /> Analyst Review Required</span>
+</footer>
       </main>
     </div>
   );

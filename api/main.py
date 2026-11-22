@@ -10,6 +10,25 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from io import BytesIO
+from datetime import datetime, timezone
+
+from fastapi.responses import StreamingResponse
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
+from xml.sax.saxutils import escape
+
 
 # ============================================================
 # PROJECT PATHS
@@ -128,7 +147,14 @@ class CampaignMatchRequest(BaseModel):
     Lure_Theme: str | None = None
     Subdomain_Pattern: str | None = None
 
-
+class InvestigationReportRequest(BaseModel):
+    ioc: str = Field(min_length=1, max_length=253)
+    enrichment: dict = Field(default_factory=dict)
+    analysis_result: dict = Field(default_factory=dict)
+class InvestigationAssistantRequest(BaseModel):
+    ioc: str = Field(min_length=1, max_length=253)
+    analysis_result: dict = Field(default_factory=dict)
+    enrichment: dict = Field(default_factory=dict)
 # ============================================================
 # HOME ENDPOINT
 # ============================================================
@@ -501,3 +527,298 @@ def enrich_ioc(request: IOCEnrichmentRequest):
         )
 
     return result
+
+
+# ============================================================
+# PDF INVESTIGATION REPORT
+# ============================================================
+
+@app.post("/generate-report")
+def generate_investigation_report(request: InvestigationReportRequest):
+
+    buffer = BytesIO()
+
+    try:
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "ReportTitle",
+            parent=styles["Title"],
+            fontSize=19,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#183153"),
+            spaceAfter=18,
+        )
+
+        heading_style = ParagraphStyle(
+            "SectionHeading",
+            parent=styles["Heading2"],
+            textColor=colors.HexColor("#24558A"),
+            spaceBefore=12,
+            spaceAfter=7,
+        )
+
+        body_style = styles["BodyText"]
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=0.65 * inch,
+            leftMargin=0.65 * inch,
+            topMargin=0.65 * inch,
+            bottomMargin=0.65 * inch,
+        )
+
+        story = []
+
+        def safe_text(value):
+            if value is None or value == "":
+                return "Not available"
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value, ensure_ascii=False)
+            return escape(str(value))
+
+        def add_section(title, rows):
+            story.append(Paragraph(escape(title), heading_style))
+
+            table_data = [
+                [
+                    Paragraph("<b>Field</b>", body_style),
+                    Paragraph("<b>Details</b>", body_style),
+                ]
+            ]
+
+            for label, value in rows:
+                table_data.append([
+                    Paragraph(safe_text(label), body_style),
+                    Paragraph(safe_text(value), body_style),
+                ])
+
+            table = Table(
+                table_data,
+                colWidths=[2.0 * inch, 4.8 * inch],
+                repeatRows=1,
+            )
+
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]))
+
+            story.append(table)
+            story.append(Spacer(1, 8))
+
+        enrichment = request.enrichment
+        analysis = request.analysis_result
+        attribution = analysis.get("attribution") or {}
+        top_match = analysis.get("top_match") or analysis.get("top_candidate") or {}
+
+        story.append(Paragraph("APT INTELLIGENCE SYSTEM", title_style))
+        story.append(Paragraph("IOC Investigation Report", styles["Heading2"]))
+        story.append(Spacer(1, 8))
+
+        story.append(Paragraph(
+            f"<b>Generated:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+            body_style,
+        ))
+
+        add_section("1. IOC Details", [
+            ("Indicator", request.ioc),
+            ("IP address", enrichment.get("IP")),
+            ("ASN", enrichment.get("ASN")),
+            ("Registrar", enrichment.get("Registrar")),
+        ])
+
+        add_section("2. DNS Enrichment", [
+            ("DNS status", enrichment.get("dns_status")),
+            ("Resolved IP addresses", enrichment.get("ip_addresses")),
+            ("Enrichment source", enrichment.get("enrichment_source")),
+            ("DNS warning", enrichment.get("warning")),
+        ])
+
+        add_section("3. Campaign Analysis", [
+            ("Match status", analysis.get("match_status")),
+            ("Discovered campaign", top_match.get("campaign_profile_id")),
+            ("Similarity score", analysis.get("similarity_score")),
+            ("Strong evidence count", analysis.get("strong_evidence_count")),
+            ("Matched IOC", top_match.get("matched_ioc")),
+            ("Evidence", analysis.get("evidence")),
+        ])
+
+        add_section("4. Threat Actor Attribution", [
+            ("Attribution status", attribution.get("attribution_status")),
+            ("Candidate actor", attribution.get("candidate_actor")),
+            ("Dataset attribution confidence", attribution.get("dataset_attribution_confidence")),
+            ("Reference campaign", attribution.get("reference_campaign_id")),
+            ("Reference label", attribution.get("reference_campaign_label")),
+            ("Rationale", attribution.get("attribution_rationale")),
+            ("Attribution warning", attribution.get("warning")),
+        ])
+
+        add_section("5. Analyst Notes", [
+            (
+                "Assessment limitation",
+                "Campaign similarity and actor attribution are candidate assessments. "
+                "They are not independently verified threat actor identifications.",
+            ),
+            (
+                "Recommended action",
+                "Review the underlying infrastructure evidence, validate indicators "
+                "using trusted threat intelligence sources, and conduct analyst review "
+                "before making an attribution decision.",
+            ),
+        ])
+
+        doc.build(story)
+
+        buffer.seek(0)
+
+        filename = "APT_Investigation_Report.pdf"
+
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            },
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF report generation failed: {str(error)}",
+        )
+
+@app.post("/investigation-assistant")
+def investigation_assistant(request: InvestigationAssistantRequest):
+    try:
+        analysis = request.analysis_result or {}
+        enrichment = request.enrichment or {}
+
+        top_match = (
+            analysis.get("top_match")
+            or analysis.get("top_candidate")
+            or {}
+        )
+
+        attribution = analysis.get("attribution") or {}
+
+        match_status = analysis.get("status", "Unknown")
+        campaign_id = top_match.get("campaign_profile_id")
+        matched_ioc = top_match.get("matched_member")
+        score = top_match.get("score", 0)
+        strong_evidence = top_match.get("strong_evidence_count", 0)
+        evidence = top_match.get("evidence") or []
+
+        findings = []
+        uncertainties = []
+        recommended_actions = []
+
+        candidate_found = (
+            match_status == "Candidate campaign match"
+            and bool(campaign_id)
+            and strong_evidence >= 2
+        )
+
+        if candidate_found:
+            summary = (
+                f"The IOC {request.ioc} meets the current heuristic "
+                f"candidate-matching criteria for discovered profile "
+                f"{campaign_id}. The similarity score is {score}, "
+                f"with {strong_evidence} strong evidence signal(s). "
+                "This is a candidate match requiring analyst validation."
+            )
+
+            findings.append(f"Candidate campaign profile: {campaign_id}")
+
+            if matched_ioc:
+                findings.append(f"Matched reference IOC: {matched_ioc}")
+
+            if evidence:
+                findings.append(f"Supporting evidence fields: {evidence}")
+
+            recommended_actions.extend([
+                "Validate the matched IP, certificate, favicon, or kit indicators against trusted sources.",
+                "Compare the observed phishing behaviour, lure theme, target sector, and infrastructure.",
+                "Review the reference campaign and supporting IOC records before accepting the match.",
+            ])
+
+        else:
+            summary = (
+                f"No established campaign match was identified for "
+                f"{request.ioc} under the current matching rules. "
+                "This does not establish that the IOC is benign."
+            )
+
+            findings.append("No candidate campaign met the current matching criteria.")
+
+            if campaign_id:
+                findings.append(
+                    f"Closest discovered profile: {campaign_id} "
+                    f"(similarity score: {score})"
+                )
+
+            recommended_actions.extend([
+                "Collect additional infrastructure and campaign characteristics.",
+                "Compare the IOC against trusted threat intelligence sources.",
+                "Re-run campaign analysis when additional evidence becomes available.",
+            ])
+
+        candidate_actor = attribution.get("candidate_actor")
+
+        if candidate_actor:
+            findings.append(
+                f"Dataset-derived candidate actor: {candidate_actor}"
+            )
+            findings.append(
+                "Attribution status: "
+                + str(attribution.get("attribution_status", "Not specified"))
+            )
+
+            uncertainties.append(
+                "The candidate actor label comes from the reference dataset "
+                "and is not an independently verified attribution."
+            )
+
+        uncertainties.extend([
+            "Similarity scores are heuristic scores, not probabilities.",
+            "A candidate campaign match does not prove common ownership or actor identity.",
+            "A missing campaign match does not mean the IOC is safe or benign.",
+            "Available enrichment may be incomplete or change over time.",
+        ])
+
+        if enrichment.get("dns_status"):
+            uncertainties.append(
+                "DNS resolution provides infrastructure information only; "
+                "it does not establish maliciousness."
+            )
+
+        recommended_actions.extend([
+            "Preserve the IOC, enrichment results, timestamps, and relevant logs.",
+            "Require analyst review before making a threat actor attribution decision.",
+        ])
+
+        return {
+            "assistant_type": "Evidence-grounded investigation assistant (rule-based)",
+            "ioc": request.ioc,
+            "summary": summary,
+            "findings": findings,
+            "uncertainties": uncertainties,
+            "recommended_actions": recommended_actions,
+            "disclaimer": (
+                "This assistant generates a rule-based summary from the "
+                "system's analysis results. It does not independently verify "
+                "threat intelligence or identify threat actors."
+            ),
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Investigation assistant failed: {str(error)}",
+        )

@@ -3,6 +3,9 @@
 venv/
 __pycache__/
 *.py[cod]
+# Keep the trained domain classifier
+!model_artifacts/
+!model_artifacts/domain_classifier.joblib
 
 # Node dependencies and build output
 node_modules/

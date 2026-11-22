@@ -7,6 +7,12 @@ import {
 } from "lucide-react";
 import "./App.css";
 
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+
+const ML_API_URL =
+  import.meta.env.VITE_ML_API_URL || "http://127.0.0.1:8000";
+
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, group: "MAIN" },
   { label: "IOC Search", icon: Search, group: "MAIN" },
@@ -47,7 +53,7 @@ useEffect(() => {
   async function fetchCampaignStats() {
     try {
       const response = await fetch(
-        "http://localhost:8000/campaign-stats"
+        ML_API_URL + "/campaign-stats"
       );
 
       if (!response.ok) {
@@ -80,7 +86,7 @@ useEffect(() => {
   async function fetchRecentIOCs() {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/ioc-history"
+        BACKEND_URL + "/api/ioc-history"
       );
 
       if (!response.ok) {
@@ -102,7 +108,7 @@ useEffect(() => {
   useEffect(() => {
     async function fetchCampaigns() {
       try {
-        const response = await fetch("http://localhost:8000/campaigns");
+        const response = await fetch(ML_API_URL + "/campaigns");
 
         if (!response.ok) {
           throw new Error("Unable to load campaign data.");
@@ -283,7 +289,7 @@ function IOCSearch() {
     setResult(null);
 
     try {
-       const response = await fetch("http://localhost:5000/api/predict", {
+       const response = await fetch(BACKEND_URL + "/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain: query.trim() }),
@@ -366,7 +372,7 @@ function IOCHistory() {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/ioc-history");
+      const response = await fetch(BACKEND_URL + "/api/ioc-history");
 
       if (!response.ok) {
         throw new Error("Unable to load IOC history.");
@@ -555,7 +561,7 @@ const [expandedProfiles, setExpandedProfiles] = useState({});
     async function fetchCampaignStats() {
       try {
         const response = await fetch(
-          "http://127.0.0.1:8000/campaign-stats"
+          ML_API_URL + "/campaign-stats"
         );
 
         if (!response.ok) {
@@ -582,7 +588,7 @@ const [expandedProfiles, setExpandedProfiles] = useState({});
         setError("");
 
         const response = await fetch(
-          "http://127.0.0.1:8000/campaigns"
+          ML_API_URL + "/campaigns"
         );
 
         if (!response.ok) {
@@ -900,7 +906,7 @@ const [assistantError, setAssistantError] = useState("");
 
   try {
     const response = await fetch(
-      "http://127.0.0.1:8000/enrich-ioc",
+      ML_API_URL + "/enrich-ioc",
       {
         method: "POST",
         headers: {
@@ -992,7 +998,7 @@ const [assistantError, setAssistantError] = useState("");
     setResult(null);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/campaign-match", {
+      const response = await fetch(ML_API_URL + "/campaign-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1018,7 +1024,7 @@ const [assistantError, setAssistantError] = useState("");
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/generate-report",
+        ML_API_URL + "/generate-report",
         {
           method: "POST",
           headers: {
@@ -1065,7 +1071,7 @@ const [assistantError, setAssistantError] = useState("");
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/investigation-assistant",
+        ML_API_URL + "/investigation-assistant",
         {
           method: "POST",
           headers: {
@@ -1421,7 +1427,7 @@ function RelationshipGraph() {
         setLoading(true);
         setError("");
 
-        const response = await fetch("http://127.0.0.1:8000/campaigns");
+        const response = await fetch(ML_API_URL + "/campaigns");
 
         if (!response.ok) {
           throw new Error("Unable to load campaign profiles.");
@@ -1694,7 +1700,7 @@ export default function App() {
 
     async function checkBackend() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/health");
+        const response = await fetch(ML_API_URL + "/health");
         const data = await response.json();
         if (active) {
           setBackendConnected(response.ok && data.status === "healthy" && data.model_loaded === true);

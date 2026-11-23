@@ -28,6 +28,7 @@ datasets/*
 !datasets/processed/
 datasets/processed/*
 !datasets/processed/campaign_profiles.json
+!datasets/processed/discovered_campaign_clusters.csv
 
 # Keep evaluation exports local until reviewed
 reports/*.csv

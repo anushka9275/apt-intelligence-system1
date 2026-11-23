@@ -1,0 +1,69 @@
+IOC,Discovered_Cluster_ID,Cluster_Size,Status,Similarity_Threshold
+airforce-circular-update.in.example,DISC-01,5,Candidate campaign,0.5
+armynet-verify.in.example,DISC-01,5,Candidate campaign,0.5
+mod-secure-portal.in.example,DISC-01,5,Candidate campaign,0.5
+navy-pay-slip-check.in.example,DISC-01,5,Candidate campaign,0.5
+secure-mod-gov.in.example,DISC-01,5,Candidate campaign,0.5
+armed-forces-medical-claim.in.example,DISC-02,5,Candidate campaign,0.5
+army-pension-status.in.example,DISC-02,5,Candidate campaign,0.5
+csd-canteen-portal.in.example,DISC-02,5,Candidate campaign,0.5
+mod-welfare-fund.in.example,DISC-02,5,Candidate campaign,0.5
+veteran-benefits-check.in.example,DISC-02,5,Candidate campaign,0.5
+coal-ministry-tender-doc.example.in,DISC-03,5,Candidate campaign,0.5
+energy-dept-circular.example.in,DISC-03,5,Candidate campaign,0.5
+grid-corp-circular.example.in,DISC-03,5,Candidate campaign,0.5
+power-ministry-tender.example.in,DISC-03,5,Candidate campaign,0.5
+thermal-plant-tender-doc.example.in,DISC-03,5,Candidate campaign,0.5
+crm-login-update.com.example,DISC-04,5,Candidate campaign,0.5
+crm-portal-secure.com.example,DISC-04,5,Candidate campaign,0.5
+employee-benefits-reset.com.example,DISC-04,5,Candidate campaign,0.5
+hr-portal-reset.com.example,DISC-04,5,Candidate campaign,0.5
+payroll-system-alert.com.example,DISC-04,5,Candidate campaign,0.5
+conference-invite-verify.in.example,DISC-05,4,Candidate campaign,0.5
+edu-scholarship-apply.in.example,DISC-05,4,Candidate campaign,0.5
+phd-fellowship-form.in.example,DISC-05,4,Candidate campaign,0.5
+research-grant-portal.in.example,DISC-05,4,Candidate campaign,0.5
+consular-services-update.in.example,DISC-06,4,Candidate campaign,0.5
+diplomat-travel-advisory.in.example,DISC-06,4,Candidate campaign,0.5
+embassy-visa-notice.in.example,DISC-06,4,Candidate campaign,0.5
+mea-circular-notice.in.example,DISC-06,4,Candidate campaign,0.5
+border-force-app-update.example.pk,DISC-07,3,Candidate campaign,0.5
+military-comms-app-verify.example.pk,DISC-07,3,Candidate campaign,0.5
+secure-chat-update.example.pk,DISC-07,3,Candidate campaign,0.5
+ngo-policy-brief-share.example.org,DISC-08,3,Candidate campaign,0.5
+policy-consultation-invite.example.org,DISC-08,3,Candidate campaign,0.5
+thinktank-report-access.example.org,DISC-08,3,Candidate campaign,0.5
+account-suspended-alert.example.com,UNCLUSTERED,1,No match above threshold,0.5
+adobe-document-share.example.com,UNCLUSTERED,1,No match above threshold,0.5
+amazon-order-issue.example.io,UNCLUSTERED,1,No match above threshold,0.5
+apple-id-locked-alert.example.com,UNCLUSTERED,1,No match above threshold,0.5
+bank-otp-verify-now.example.co,UNCLUSTERED,1,No match above threshold,0.5
+bank-verify-update.example.io,UNCLUSTERED,1,No match above threshold,0.5
+cloud-storage-quota-alert.example.co,UNCLUSTERED,1,No match above threshold,0.5
+courier-customs-fee.example.co,UNCLUSTERED,1,No match above threshold,0.5
+crypto-wallet-verify.example.co,UNCLUSTERED,1,No match above threshold,0.5
+dhl-parcel-redelivery.example.com,UNCLUSTERED,1,No match above threshold,0.5
+docusign-signature-request.example.io,UNCLUSTERED,1,No match above threshold,0.5
+event-ticket-confirmation.example.net,UNCLUSTERED,1,No match above threshold,0.5
+facebook-page-violation.example.org,UNCLUSTERED,1,No match above threshold,0.5
+free-gift-cardz.example.net,UNCLUSTERED,1,No match above threshold,0.5
+govbenefits-claim-now.example.io,UNCLUSTERED,1,No match above threshold,0.5
+hr-payslip-portal.example.io,UNCLUSTERED,1,No match above threshold,0.5
+instagram-copyright-notice.example.net,UNCLUSTERED,1,No match above threshold,0.5
+insurance-claim-portal.example.com,UNCLUSTERED,1,No match above threshold,0.5
+invoice-payment-due.example.org,UNCLUSTERED,1,No match above threshold,0.5
+job-offer-hr-review.example.org,UNCLUSTERED,1,No match above threshold,0.5
+linkedin-connection-request.example.net,UNCLUSTERED,1,No match above threshold,0.5
+linkedin-security-alert.example.net,UNCLUSTERED,1,No match above threshold,0.5
+microsoft365-login-secure.example.co,UNCLUSTERED,1,No match above threshold,0.5
+netflix-billing-issue.example.org,UNCLUSTERED,1,No match above threshold,0.5
+outlook-storage-full.example.org,UNCLUSTERED,1,No match above threshold,0.5
+paypal-account-locked.example.net,UNCLUSTERED,1,No match above threshold,0.5
+payroll-tax-form-update.example.org,UNCLUSTERED,1,No match above threshold,0.5
+shared-file-access-request.example.org,UNCLUSTERED,1,No match above threshold,0.5
+streaming-subscription-renew.example.net,UNCLUSTERED,1,No match above threshold,0.5
+tax-refund-processing.example.io,UNCLUSTERED,1,No match above threshold,0.5
+telegram-account-verify.example.com,UNCLUSTERED,1,No match above threshold,0.5
+webmail-quota-exceeded.example.net,UNCLUSTERED,1,No match above threshold,0.5
+wetransfer-file-ready.example.co,UNCLUSTERED,1,No match above threshold,0.5
+zoom-meeting-invite-verify.example.org,UNCLUSTERED,1,No match above threshold,0.5

@@ -364,8 +364,10 @@ function IOCHistory() {
   fetchHistory();
 }
   const [records, setRecords] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("All");
+const [searchTerm, setSearchTerm] = useState("");
+const [filter, setFilter] = useState("All");
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
 
   async function fetchHistory() {
     setLoading(true);
